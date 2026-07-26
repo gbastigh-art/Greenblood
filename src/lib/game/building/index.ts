@@ -567,6 +567,9 @@ function makeRoofGeo(tier: TierType): THREE.BufferGeometry {
 }
 
 // ===== Main geometry generation function =====
+// Geometries are cached and SHARED between instances of the same type/tier/legExt.
+// Multiple THREE.Mesh instances can reference the same BufferGeometry safely.
+// This drastically reduces GPU memory and draw call setup cost.
 export function generateBuildGeometry(
   pieceType: BuildPieceType,
   tier: TierType,
@@ -574,7 +577,7 @@ export function generateBuildGeometry(
 ): THREE.BufferGeometry {
   const key = cacheKey(pieceType, tier, legExtension);
   const cached = geoCache.get(key);
-  if (cached) return cached.clone();
+  if (cached) return cached;
 
   let geo: THREE.BufferGeometry | null = null;
 
@@ -633,7 +636,7 @@ export function generateBuildGeometry(
   }
 
   geoCache.set(key, geo);
-  return geo.clone();
+  return geo;
 }
 
 // Calculate how much foundation legs need to extend based on terrain height under the foundation.
@@ -1079,10 +1082,30 @@ export interface CollisionBox {
 // These are tight-fitted to the actual visual geometry, not oversized boxes.
 // Returns an array of collision boxes for complex shapes (stairs).
 // Also returns walkable surface Y for foundations/floors (player can stand on top).
+//
+// Results are CACHED by (pieceType, tier) — collision boxes are static data, so
+// the same key always returns the same object. This avoids allocating new
+// arrays + box objects every frame in the player movement + ground-detection
+// loops (which call this via getAllWorldCollisionBoxes / getWalkableSurfaceY).
+const collBoxCache = new Map<string, { boxes: CollisionBox[]; walkableY?: number; isSlope?: boolean }>();
+
 export function getCollisionBoxes(pieceType: BuildPieceType, tier: TierType): {
   boxes: CollisionBox[];
   walkableY?: number; // Y (world-relative) of walkable top surface
   isSlope?: boolean;  // stairs have walkable slopes
+} {
+  const cacheKey = `${pieceType}_${tier}`;
+  const cached = collBoxCache.get(cacheKey);
+  if (cached) return cached;
+  const result = computeCollisionBoxes(pieceType, tier);
+  collBoxCache.set(cacheKey, result);
+  return result;
+}
+
+function computeCollisionBoxes(pieceType: BuildPieceType, tier: TierType): {
+  boxes: CollisionBox[];
+  walkableY?: number;
+  isSlope?: boolean;
 } {
   const s = TIER_SCALE[tier];
   const t = WALL_THICKNESS * s;
