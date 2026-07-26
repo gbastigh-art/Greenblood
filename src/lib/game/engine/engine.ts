@@ -21,7 +21,8 @@ import {
   generateBuildGeometry, findSnapPosition, getHologramColor, checkPlacementValidity,
   calculateFoundationLegExtension, calculateFoundationPlacement,
   generateDeployableGeometry, findDoorwaySockets,
-  DEPLOYABLE_DEFS, getWorldCollisionBox, shouldBlockPlayer, checkDeployableOverlap,
+  DEPLOYABLE_DEFS, getWorldCollisionBox, getAllWorldCollisionBoxes, shouldBlockPlayer, checkDeployableOverlap,
+  findDeployableSnapPosition, getWalkableSurfaceY, getCollisionBoxes,
   type BuildPieceType, type TierType, type PlacedBuildV2,
   type DeployableType, type PlacedDeployable,
 } from "../building/index";
@@ -467,6 +468,15 @@ export class Engine {
       useGame.subscribe((s, prev) => {
         if (s.buildKind !== prev.buildKind) this.updateGhost();
         if (s.buildRotation !== prev.buildRotation) this.updateGhost();
+        if (s.selectedBuildPiece !== prev.selectedBuildPiece) {
+          // Remove old ghost so it regenerates with new piece type
+          if (this.ghostV2Mesh) {
+            this.scene.remove(this.ghostV2Mesh);
+            this.ghostV2Mesh.geometry.dispose();
+            (this.ghostV2Mesh.material as THREE.Material).dispose();
+            this.ghostV2Mesh = null;
+          }
+        }
         if (s.equipHotbarIndex !== prev.equipHotbarIndex) this.updateHeldItem();
         if (s.hotbar !== prev.hotbar) this.updateHeldItem();
         if (s.clothing !== prev.clothing) {
@@ -998,9 +1008,13 @@ export class Engine {
       // Rust-style: open radial menu when holding Building Plan or Hammer
       const activeSlot = g.hotbar[g.equipHotbarIndex];
       const activeId = activeSlot?.id;
-      if (activeId === "buildingPlan" && g.mode === "play") {
+      if (activeId === "buildingPlan" && g.mode === "play" && !g.radialMenuOpen) {
         g.openRadialMenu("build");
-      } else if (activeId === "hammer" && g.mode === "play") {
+      } else if (activeId === "hammer" && g.mode === "play" && !g.radialMenuOpen) {
+        g.openRadialMenu("hammer");
+      }
+      // If already in upgrade sub-menu, right-click goes back to hammer menu
+      if (g.radialMenuType === "upgrade" && e.button === 2) {
         g.openRadialMenu("hammer");
       }
     }
@@ -1011,6 +1025,15 @@ export class Engine {
   }
   onMouseMove(e: MouseEvent) {
     if (!this.mouseLocked) return;
+    // Don't rotate camera while radial menu is open
+    const g = useGame.getState();
+    if (g.radialMenuOpen) {
+      // Only track radial menu mouse position, don't move camera
+      const mx = Math.max(-1, Math.min(1, g.radialMenuMouseX + e.movementX * 0.015));
+      const my = Math.max(-1, Math.min(1, g.radialMenuMouseY + e.movementY * 0.015));
+      g.setRadialMousePos(mx, my);
+      return;
+    }
     const sens = 0.0022;
     this.playerYaw -= e.movementX * sens;
     this.playerPitch -= e.movementY * sens;
@@ -1020,14 +1043,6 @@ export class Engine {
     this.swayTarget.y += e.movementY * 0.0008;
     this.swayTarget.x = Math.max(-0.05, Math.min(0.05, this.swayTarget.x));
     this.swayTarget.y = Math.max(-0.05, Math.min(0.05, this.swayTarget.y));
-    // Track radial menu mouse position (normalized -1..1)
-    // Use raw mouse movement direction (not inverted)
-    const g = useGame.getState();
-    if (g.radialMenuOpen) {
-      const mx = Math.max(-1, Math.min(1, g.radialMenuMouseX + e.movementX * 0.015));
-      const my = Math.max(-1, Math.min(1, g.radialMenuMouseY + e.movementY * 0.015));
-      g.setRadialMousePos(mx, my);
-    }
   }
   onWheel(e: WheelEvent) {
     const g = useGame.getState();
@@ -1787,18 +1802,27 @@ export class Engine {
       const dz = z - cz;
       if (dx * dx + dz * dz < pr * pr) return true;
     }
-    // Placed V2 builds (Rust-style building system) — AABB collision
+    // Placed V2 builds (Rust-style building system) — AABB collision with Y check
     const placedV2 = useGame.getState().placedV2;
+    const playerY = this.playerPos.y;
+    const playerHeadY = playerY + (this.playerCrouch ? 1.2 : this.playerEyeHeight);
     for (let i = 0; i < placedV2.length; i++) {
       const pb = placedV2[i];
-      // Skip non-blocking piece types (floors, stairs, roofs, etc.)
+      // Skip non-blocking piece types (floors, roofs, etc.)
       if (!shouldBlockPlayer(pb.pieceType)) continue;
-      const box = getWorldCollisionBox(pb);
-      const cx = Math.max(box.minX, Math.min(x, box.maxX));
-      const cz = Math.max(box.minZ, Math.min(z, box.maxZ));
-      const dx = x - cx;
-      const dz = z - cz;
-      if (dx * dx + dz * dz < pr * pr) return true;
+      // Use all collision boxes for precise multi-box collision (stairs, etc.)
+      const allBoxes = getAllWorldCollisionBoxes(pb);
+      let blocked = false;
+      for (const box of allBoxes) {
+        // Y-aware: only block if player body overlaps vertically with this box
+        if (playerY >= box.maxY || playerHeadY <= box.minY) continue;
+        const cx = Math.max(box.minX, Math.min(x, box.maxX));
+        const cz = Math.max(box.minZ, Math.min(z, box.maxZ));
+        const dx = x - cx;
+        const dz = z - cz;
+        if (dx * dx + dz * dz < pr * pr) { blocked = true; break; }
+      }
+      if (blocked) return true;
     }
     // Placed V2 deployables — simple AABB collision (storage boxes, etc.)
     const placedDeps = useGame.getState().placedDeployables;
@@ -3025,8 +3049,30 @@ export class Engine {
     // Terrain collision
     const groundY = this.terrain.getHeight(this.playerPos.x, this.playerPos.z);
     const eyeH = this.playerCrouch ? 1.2 : this.playerEyeHeight;
-    if (this.playerPos.y <= groundY + 0.01) {
-      this.playerPos.y = groundY;
+    // Also check building surfaces (foundations, floors, stairs) for walkable ground
+    let buildGroundY: number | null = null;
+    const placedV2Ground = useGame.getState().placedV2;
+    for (let i = 0; i < placedV2Ground.length; i++) {
+      const pb = placedV2Ground[i];
+      const surfY = getWalkableSurfaceY(pb);
+      if (surfY === null) continue;
+      // Check if player is within the XZ footprint of this build
+      const allBoxes = getAllWorldCollisionBoxes(pb);
+      for (const box of allBoxes) {
+        // For walkable surfaces, check XZ overlap loosely (within the top surface)
+        // Use the full box footprint, but only the top Y matters
+        if (this.playerPos.x >= box.minX - 0.1 && this.playerPos.x <= box.maxX + 0.1 &&
+            this.playerPos.z >= box.minZ - 0.1 && this.playerPos.z <= box.maxZ + 0.1) {
+          if (buildGroundY === null || surfY > buildGroundY) {
+            buildGroundY = surfY;
+          }
+        }
+      }
+    }
+    // Pick the highest ground: terrain or building surface
+    const effectiveGround = buildGroundY !== null && buildGroundY > groundY ? buildGroundY : groundY;
+    if (this.playerPos.y <= effectiveGround + 0.01) {
+      this.playerPos.y = effectiveGround;
       this.playerVel.y = 0;
       this.playerOnGround = true;
     } else {
@@ -4163,7 +4209,7 @@ export class Engine {
       g.setSelectedBuildPiece(null);
     }
 
-    // Handle hammer: detect what build piece the player is looking at
+    // Handle hammer: detect what build piece or deployable the player is looking at
     if (activeId === "hammer") {
       const ray = new THREE.Raycaster();
       ray.setFromCamera(new THREE.Vector2(0, 0), this.camera);
@@ -4173,16 +4219,29 @@ export class Engine {
         const m = (pb as any).mesh as THREE.Object3D;
         if (m) targets.push(m);
       }
+      // Also ray against deployables
+      for (const dep of g.placedDeployables) {
+        const m = (dep as any).mesh as THREE.Object3D;
+        if (m) targets.push(m);
+      }
       const hits = ray.intersectObjects(targets, true);
       if (hits.length > 0) {
         const hitObj = hits[0].object;
-        // Traverse up to find the root mesh that matches a placed build
+        // Traverse up to find the root mesh that matches a placed build or deployable
         let buildId: number | null = null;
         let current: THREE.Object3D | null = hitObj;
         while (current) {
           for (const pb of g.placedV2) {
             const m = (pb as any).mesh as THREE.Object3D;
             if (m === current) { buildId = pb.id; break; }
+          }
+          if (buildId !== null) break;
+          // Check deployables
+          if (buildId === null) {
+            for (const dep of g.placedDeployables) {
+              const m = (dep as any).mesh as THREE.Object3D;
+              if (m === current) { buildId = -dep.id; break; } // negative = deployable
+            }
           }
           if (buildId !== null) break;
           current = current.parent;
@@ -4224,7 +4283,7 @@ export class Engine {
     const mat = new THREE.MeshBasicMaterial({
       color: getHologramColor(true),
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.35,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
@@ -4261,9 +4320,11 @@ export class Engine {
       color: tv.color,
       roughness: tv.roughness,
       metalness: tv.metalness,
-      transparent: tv.opacity < 1,
-      opacity: tv.opacity,
+      transparent: false,
+      opacity: 1.0,
       flatShading: tv.flatShading,
+      side: THREE.DoubleSide,
+      depthWrite: true,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(pos);
@@ -4305,6 +4366,11 @@ export class Engine {
       const m = (pb as any).mesh as THREE.Object3D;
       if (m) targets.push(m);
     }
+    // Also add existing deployables as ray targets
+    for (const dep of g.placedDeployables) {
+      const m = (dep as any).mesh as THREE.Object3D;
+      if (m) targets.push(m);
+    }
     const hits = ray.intersectObjects(targets, true);
     if (hits.length === 0) return;
 
@@ -4328,8 +4394,14 @@ export class Engine {
       placeRot = doorSocket.rotation;
       attachedBuildId = doorSocket.buildId;
     } else {
-      // Free-place: snap Y to terrain or top of hit surface
-      placePos.y = hitPoint.y;
+      // Free-place: snap to same-type deployable if nearby, otherwise use hit point
+      const snapResult = findDeployableSnapPosition(itemType, placePos, g.placedDeployables);
+      if (snapResult.snapped) {
+        placePos = snapResult.position;
+      } else {
+        // Snap Y to terrain or top of hit surface
+        placePos.y = hitPoint.y;
+      }
     }
 
     // Check inventory
@@ -4350,6 +4422,7 @@ export class Engine {
       color: 0x6b4a2b, // wood color for most deployables
       roughness: 0.9,
       metalness: 0.0,
+      side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(placePos);
@@ -4377,6 +4450,40 @@ export class Engine {
   tryHammerAction(action: string) {
     const g = useGame.getState();
     if (g.hammerTargetId === null) return;
+
+    // Check if target is a deployable (negative ID) or a build piece (positive ID)
+    const isDeployable = g.hammerTargetId < 0;
+
+    if (isDeployable) {
+      const depId = -g.hammerTargetId;
+      const dep = g.placedDeployables.find((d) => d.id === depId);
+      if (!dep) return;
+      const mesh = (dep as any).mesh as THREE.Mesh;
+      if (!mesh) return;
+
+      switch (action) {
+        case "demolish": {
+          // Remove the deployable
+          this.scene.remove(mesh);
+          mesh.geometry.dispose();
+          (mesh.material as THREE.Material).dispose();
+          g.removeDeployable(dep.id);
+          // Return materials
+          g.addItem(dep.type, 1);
+          g.toast(`Demolished ${dep.type}`, "info");
+          g.emitAudio("hit");
+          break;
+        }
+        case "repair":
+        case "rotate":
+        case "upgrade":
+          g.toast("Cannot upgrade/repair/rotate deployables", "warn");
+          break;
+      }
+      return;
+    }
+
+    // Normal build piece handling
     const pb = g.placedV2.find((p) => p.id === g.hammerTargetId);
     if (!pb) return;
     const mesh = (pb as any).mesh as THREE.Mesh;

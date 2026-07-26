@@ -78,25 +78,28 @@ export interface BuildPieceDef {
   gridD: number; // depth in grid units
   height: number; // height in meters
   woodCost: number; // wood to place as twig
+  displayName: string; // human-readable name
+  description: string; // short description for radial menu
+  resourceType: string; // primary resource item id (e.g. "wood")
   upgradeCosts: { wood: number; stone: number; metalFrag: number; armored: number };
 }
 
 export const BUILD_PIECE_DEFS: Record<BuildPieceType, BuildPieceDef> = {
-  squareFoundation: { type: "squareFoundation", category: "foundation", gridW: 1, gridD: 1, height: 0.3, woodCost: 200, upgradeCosts: { wood: 0, stone: 300, metalFrag: 400, armored: 500 } },
-  triangleFoundation: { type: "triangleFoundation", category: "foundation", gridW: 1, gridD: 1, height: 0.3, woodCost: 150, upgradeCosts: { wood: 0, stone: 225, metalFrag: 300, armored: 375 } },
-  wall: { type: "wall", category: "wall", gridW: 1, gridD: 1, height: WALL_H, woodCost: 150, upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
-  halfWall: { type: "halfWall", category: "wall", gridW: 1, gridD: 1, height: WALL_H * 0.5, woodCost: 100, upgradeCosts: { wood: 0, stone: 150, metalFrag: 200, armored: 275 } },
-  lowWall: { type: "lowWall", category: "wall", gridW: 1, gridD: 1, height: WALL_H * 0.33, woodCost: 75, upgradeCosts: { wood: 0, stone: 100, metalFrag: 150, armored: 200 } },
-  doorway: { type: "doorway", category: "wall", gridW: 1, gridD: 1, height: WALL_H, woodCost: 150, upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
-  windowFrame: { type: "windowFrame", category: "wall", gridW: 1, gridD: 1, height: WALL_H, woodCost: 150, upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
-  wallFrame: { type: "wallFrame", category: "wall", gridW: 1, gridD: 1, height: WALL_H, woodCost: 150, upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
-  squareFloor: { type: "squareFloor", category: "floor", gridW: 1, gridD: 1, height: 0.2, woodCost: 150, upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
-  triangleFloor: { type: "triangleFloor", category: "floor", gridW: 1, gridD: 1, height: 0.2, woodCost: 100, upgradeCosts: { wood: 0, stone: 150, metalFrag: 200, armored: 275 } },
-  floorFrame: { type: "floorFrame", category: "floor", gridW: 1, gridD: 1, height: 0.2, woodCost: 150, upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
-  uStairs: { type: "uStairs", category: "stairs", gridW: 1, gridD: 1, height: WALL_H, woodCost: 200, upgradeCosts: { wood: 0, stone: 300, metalFrag: 400, armored: 500 } },
-  lStairs: { type: "lStairs", category: "stairs", gridW: 1, gridD: 1, height: WALL_H, woodCost: 200, upgradeCosts: { wood: 0, stone: 300, metalFrag: 400, armored: 500 } },
-  straightStairs: { type: "straightStairs", category: "stairs", gridW: 1, gridD: 1, height: WALL_H, woodCost: 200, upgradeCosts: { wood: 0, stone: 300, metalFrag: 400, armored: 500 } },
-  roof: { type: "roof", category: "roof", gridW: 1, gridD: 1, height: 1.8, woodCost: 150, upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
+  squareFoundation: { type: "squareFoundation", category: "foundation", gridW: 1, gridD: 1, height: 0.3, woodCost: 50, displayName: "Square Foundation", description: "Create a stable foundation for your structure", resourceType: "wood", upgradeCosts: { wood: 0, stone: 300, metalFrag: 400, armored: 500 } },
+  triangleFoundation: { type: "triangleFoundation", category: "foundation", gridW: 1, gridD: 1, height: 0.3, woodCost: 25, displayName: "Triangle Foundation", description: "A triangular foundation to create angled base designs", resourceType: "wood", upgradeCosts: { wood: 0, stone: 225, metalFrag: 300, armored: 375 } },
+  wall: { type: "wall", category: "wall", gridW: 1, gridD: 1, height: WALL_H, woodCost: 50, displayName: "Wall", description: "Secure your base by enclosing it in walls", resourceType: "wood", upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
+  halfWall: { type: "halfWall", category: "wall", gridW: 1, gridD: 1, height: WALL_H * 0.5, woodCost: 25, displayName: "Half-Wall", description: "A half-height wall for varied vertical building", resourceType: "wood", upgradeCosts: { wood: 0, stone: 150, metalFrag: 200, armored: 275 } },
+  lowWall: { type: "lowWall", category: "wall", gridW: 1, gridD: 1, height: WALL_H * 0.33, woodCost: 15, displayName: "Low Wall", description: "A low wall for cover or fencing", resourceType: "wood", upgradeCosts: { wood: 0, stone: 100, metalFrag: 150, armored: 200 } },
+  doorway: { type: "doorway", category: "wall", gridW: 1, gridD: 1, height: WALL_H, woodCost: 50, displayName: "Doorway", description: "A wall with an opening for a door", resourceType: "wood", upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
+  windowFrame: { type: "windowFrame", category: "wall", gridW: 1, gridD: 1, height: WALL_H, woodCost: 50, displayName: "Window Frame", description: "A wall with an opening for a window", resourceType: "wood", upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
+  wallFrame: { type: "wallFrame", category: "wall", gridW: 1, gridD: 1, height: WALL_H, woodCost: 50, displayName: "Wall Frame", description: "A frame for double doors or garage doors", resourceType: "wood", upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
+  squareFloor: { type: "squareFloor", category: "floor", gridW: 1, gridD: 1, height: 0.2, woodCost: 50, displayName: "Square Floor", description: "Create a floor or ceiling for your base", resourceType: "wood", upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
+  triangleFloor: { type: "triangleFloor", category: "floor", gridW: 1, gridD: 1, height: 0.2, woodCost: 25, displayName: "Triangle Floor", description: "A triangular floor or ceiling piece", resourceType: "wood", upgradeCosts: { wood: 0, stone: 150, metalFrag: 200, armored: 275 } },
+  floorFrame: { type: "floorFrame", category: "floor", gridW: 1, gridD: 1, height: 0.2, woodCost: 50, displayName: "Floor Frame", description: "A floor frame for ladder hatches", resourceType: "wood", upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
+  uStairs: { type: "uStairs", category: "stairs", gridW: 1, gridD: 1, height: WALL_H, woodCost: 50, displayName: "U-Shaped Stairs", description: "A U-shaped staircase for vertical access", resourceType: "wood", upgradeCosts: { wood: 0, stone: 300, metalFrag: 400, armored: 500 } },
+  lStairs: { type: "lStairs", category: "stairs", gridW: 1, gridD: 1, height: WALL_H, woodCost: 50, displayName: "L-Shaped Stairs", description: "An L-shaped staircase for vertical access", resourceType: "wood", upgradeCosts: { wood: 0, stone: 300, metalFrag: 400, armored: 500 } },
+  straightStairs: { type: "straightStairs", category: "stairs", gridW: 1, gridD: 1, height: WALL_H, woodCost: 50, displayName: "Straight Stairs", description: "A straight staircase for vertical access", resourceType: "wood", upgradeCosts: { wood: 0, stone: 300, metalFrag: 400, armored: 500 } },
+  roof: { type: "roof", category: "roof", gridW: 1, gridD: 1, height: 1.8, woodCost: 50, displayName: "Roof", description: "A pitched roof to protect your base from above", resourceType: "wood", upgradeCosts: { wood: 0, stone: 200, metalFrag: 300, armored: 400 } },
 };
 
 // ===== Tier Visuals =====
@@ -109,7 +112,7 @@ export interface TierVisual {
 }
 
 export const TIER_VISUALS: Record<TierType, TierVisual> = {
-  twig:  { color: 0x8b6a3b, roughness: 1.0, metalness: 0.0, opacity: 0.85, flatShading: false },
+  twig:  { color: 0x8b6a3b, roughness: 1.0, metalness: 0.0, opacity: 1.0, flatShading: false },
   wood:  { color: 0x6b4a2b, roughness: 0.9, metalness: 0.0, opacity: 1.0, flatShading: false },
   stone: { color: 0x888888, roughness: 1.0, metalness: 0.0, opacity: 1.0, flatShading: true },
   metal: { color: 0x8a8a8a, roughness: 0.5, metalness: 0.6, opacity: 1.0, flatShading: false },
@@ -149,6 +152,8 @@ export interface RadialMenuItem {
   label: string;
   icon: string;
   data: string;
+  description?: string; // optional description for center display
+  resourceCost?: { id: string; qty: number; label: string }; // optional resource cost for center display
 }
 
 const SVG = {
@@ -196,17 +201,25 @@ export const BUILD_RADIAL_ITEMS: RadialMenuItem[] = [
 ];
 
 export const HAMMER_RADIAL_ITEMS: RadialMenuItem[] = [
-  { id: "upgrade", label: "Upgrade", icon: SVG.upgrade, data: "upgrade" },
-  { id: "repair", label: "Repair", icon: SVG.repair, data: "repair" },
-  { id: "rotate", label: "Rotate", icon: SVG.rotate, data: "rotate" },
-  { id: "demolish", label: "Demolish", icon: SVG.demolish, data: "demolish" },
+  { id: "upgrade", label: "Upgrade", icon: SVG.upgrade, data: "upgrade", description: "Upgrade a building to the next tier" },
+  { id: "repair", label: "Repair", icon: SVG.repair, data: "repair", description: "Repair a damaged building" },
+  { id: "rotate", label: "Rotate", icon: SVG.rotate, data: "rotate", description: "Rotate a building 90 degrees" },
+  { id: "demolish", label: "Demolish", icon: SVG.demolish, data: "demolish", description: "Demolish a building for partial refund" },
 ];
 
+// Upgrade resource costs for center display
+const UPGRADE_COST_INFO: Record<string, { id: string; qty: number; label: string }> = {
+  wood: { id: "wood", qty: 200, label: "Wood" },
+  stone: { id: "stone", qty: 300, label: "Stones" },
+  metal: { id: "metalFrag", qty: 200, label: "Metal Fragments" },
+  armored: { id: "metalFrag", qty: 500, label: "Metal Fragments" },
+};
+
 export const UPGRADE_RADIAL_ITEMS: RadialMenuItem[] = [
-  { id: "t_wood", label: "Wood", icon: SVG.wood, data: "wood" },
-  { id: "t_stone", label: "Stone", icon: SVG.stone, data: "stone" },
-  { id: "t_metal", label: "Metal", icon: SVG.metal, data: "metal" },
-  { id: "t_armored", label: "Armored", icon: SVG.armored, data: "armored" },
+  { id: "t_wood", label: "Wood Tier", icon: SVG.wood, data: "wood", description: "Upgrade to Wood tier", resourceCost: UPGRADE_COST_INFO.wood },
+  { id: "t_stone", label: "Stone Tier", icon: SVG.stone, data: "stone", description: "Upgrade to Stone tier", resourceCost: UPGRADE_COST_INFO.stone },
+  { id: "t_metal", label: "Metal Tier", icon: SVG.metal, data: "metal", description: "Upgrade to Metal tier", resourceCost: UPGRADE_COST_INFO.metal },
+  { id: "t_armored", label: "Armored Tier", icon: SVG.armored, data: "armored", description: "Upgrade to Armored tier", resourceCost: UPGRADE_COST_INFO.armored },
 ];
 
 // ===== Geometry Generation =====
@@ -261,10 +274,11 @@ function makeSquareFoundationGeo(tier: TierType, legExtension: number): THREE.Bu
   geos.push(boxAt(lipW, lipH, GRID * s, -GRID / 2 * s - lipW / 2, slabH + lipH / 2, 0));
 
   // 4 corner legs (extend below foundation based on terrain)
-  const baseLegH = 0.8; // minimum leg height
+  // Smaller/lower legs
+  const baseLegH = 0.6; // minimum leg height (reduced from 0.8)
   const legH = baseLegH + legExtension;
-  const legR = 0.12 * s;
-  const legOff = GRID / 2 * s - legR * 2;
+  const legR = 0.10 * s; // thinner legs
+  const legOff = GRID / 2 * s - legR * 2.5;
   for (const [lx, lz] of [[-legOff, -legOff], [legOff, -legOff], [-legOff, legOff], [legOff, legOff]]) {
     geos.push(cylAt(legR * 0.8, legR, legH, lx, -legH / 2, lz, 6));
   }
@@ -292,16 +306,18 @@ function makeTriangleFoundationGeo(tier: TierType, legExtension: number): THREE.
   platGeo.translate(0, slabH / 2, 0);
   geos.push(platGeo);
 
-  // 3 corner legs
-  const baseLegH = 0.8 + legExtension;
-  const legR = 0.12 * s;
-  const inset = legR * 3;
+  // 3 corner legs — same height as square foundation
+  const baseLegH = 0.6 + legExtension; // match square foundation base
+  const legR = 0.10 * s; // thinner legs (match square)
+  // Proper corner positions under the triangle vertices, connected to the base
+  const legInset = legR * 2.5;
   const corners: [number, number][] = [
-    [-halfG + inset, -halfG + inset],
-    [halfG - inset, -halfG + inset],
-    [-halfG + inset, halfG - inset],
+    [-halfG + legInset, -halfG + legInset], // left vertex
+    [halfG - legInset, -halfG + legInset],  // right vertex
+    [-halfG + legInset, halfG - legInset],   // back vertex (was the mispositioned one)
   ];
   for (const [lx, lz] of corners) {
+    // Legs connect to the base: start at slab bottom (y=0) and extend down
     geos.push(cylAt(legR * 0.8, legR, baseLegH, lx, -baseLegH / 2, lz, 6));
   }
 
@@ -623,7 +639,7 @@ export function generateBuildGeometry(
 // Calculate how much foundation legs need to extend based on terrain height under the foundation.
 // Returns { worldY, legExtension } where worldY is the Y position to place the foundation
 // so legs touch the lowest terrain point.
-export const BASE_LEG_HEIGHT = 0.8;
+export const BASE_LEG_HEIGHT = 0.6;
 
 export function calculateFoundationPlacement(
   worldX: number,
@@ -725,13 +741,15 @@ function getSocketsForPiece(pieceType: BuildPieceType, worldPos: THREE.Vector3, 
         });
       }
       // Horizontal edge sockets for adjacent foundations
+      // Position at edge midpoints, normal pointing outward
       for (let i = 0; i < 4; i++) {
         const angle = (i * Math.PI) / 2 + rotRad;
         const nx = Math.sin(angle);
         const nz = Math.cos(angle);
+        // Socket sits at edge midpoint — adjacent foundation center will be at GRID distance
         sockets.push({
           type: "foundation",
-          position: rotatePoint(nx * g, nz * g),
+          position: rotatePoint(nx * g / 2, nz * g / 2),
           normal: rotateNormal(nx, nz),
           orientation: rotation,
           parentPiece: pieceType,
@@ -818,7 +836,7 @@ function getSocketsForPiece(pieceType: BuildPieceType, worldPos: THREE.Vector3, 
         const nz = Math.cos(angle);
         sockets.push({
           type: "floor",
-          position: rotatePoint(nx * g, nz * g),
+          position: rotatePoint(nx * g / 2, nz * g / 2),
           normal: rotateNormal(nx, nz),
           orientation: rotation,
           parentPiece: pieceType,
@@ -909,22 +927,29 @@ export function findSnapPosition(
     }
   }
 
-  // If no socket snap found, try ground placement for foundations
-  if (!bestSnap && (def.category === "foundation")) {
-    const gx = Math.round(hitPoint.x / GRID);
-    const gz = Math.round(hitPoint.z / GRID);
-    const terrainY = terrainGetHeight(gx * GRID, gz * GRID);
-    const pos = new THREE.Vector3(gx * GRID, terrainY, gz * GRID);
-    const valid = checkPlacementValidity(pieceType, pos, currentRotation, placedBuilds);
-    return { position: pos, rotation: currentRotation, valid, snappedTo: null, snappedSocket: null };
-  }
-
+  // If no socket snap found, allow ground/air placement for all piece types
   if (!bestSnap) {
-    // Default: place at ray hit, snapped to grid
     const gx = Math.round(hitPoint.x / GRID);
     const gz = Math.round(hitPoint.z / GRID);
-    const pos = new THREE.Vector3(gx * GRID, hitPoint.y, gz * GRID);
-    return { position: pos, rotation: currentRotation, valid: false, snappedTo: null, snappedSocket: null };
+    let posY: number;
+
+    if (def.category === "foundation") {
+      // Foundation sits on terrain
+      posY = terrainGetHeight(gx * GRID, gz * GRID);
+    } else if (def.category === "wall" || def.category === "floor" || def.category === "stairs" || def.category === "roof") {
+      // Non-foundation pieces: place at the ray hit height (can go on terrain or in air)
+      // Snap Y to nearest 0.5m increment for clean stacking
+      posY = Math.round(hitPoint.y * 2) / 2;
+      // For walls on ground: ensure they sit on terrain if no higher snap found
+      if (def.category === "wall" && posY < terrainGetHeight(hitPoint.x, hitPoint.z) + 0.1) {
+        posY = terrainGetHeight(hitPoint.x, hitPoint.z);
+      }
+    } else {
+      posY = hitPoint.y;
+    }
+    const pos = new THREE.Vector3(gx * GRID, posY, gz * GRID);
+    const valid = true; // free placement is always valid when no socket snap found
+    return { position: pos, rotation: currentRotation, valid, snappedTo: null, snappedSocket: null };
   }
 
   return bestSnap;
@@ -962,15 +987,19 @@ function calculatePlacementFromSocket(
     case "floor":
       // Floor sits on top of whatever the socket is on
       if (socket.normal.y > 0) {
+        // Floor on foundation/floor top — center on it
         pos.y += def.height / 2;
       } else if (socket.type === "wall" && socket.normal.y === 0) {
-        // Floor on wall top edge — stack upward
-        pos.y += WALL_H; // wall height above the socket position
+        // Floor placed on wall side socket — this is wall-to-wall-floor connection
+        // Place floor at the same height as the wall, centered
+        pos.y = socket.position.y + def.height / 2;
       }
       break;
     case "foundation":
       // Foundation placed adjacent to another foundation
-      pos.add(socket.normal.clone().multiplyScalar(GRID));
+      // Socket is at edge midpoint (distance GRID/2 from center), so offset
+      // by another GRID/2 to reach the adjacent foundation's center (total GRID apart)
+      pos.add(socket.normal.clone().multiplyScalar(GRID / 2));
       break;
     case "stairs":
       // Stairs sit on foundation/floor top
@@ -1040,48 +1069,217 @@ export function getHologramColor(valid: boolean): number {
 }
 
 // ===== Collision helpers for the engine =====
-export function getCollisionBox(pieceType: BuildPieceType, tier: TierType): {
+
+// Collision box for a single solid piece (local space, centered at piece origin)
+export interface CollisionBox {
   minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
-} {
-  const def = BUILD_PIECE_DEFS[pieceType];
-  const s = TIER_SCALE[tier];
-  const hw = (def.gridW * GRID) / 2 * s;
-  const hd = (def.gridD * GRID) / 2 * s;
-  return {
-    minX: -hw,
-    maxX: hw,
-    minY: pieceType.startsWith("squareFoundation") || pieceType.startsWith("triangleFoundation") ? -2.0 : 0,
-    maxY: def.height * s,
-    minZ: -hd,
-    maxZ: hd,
-  };
 }
 
-// Get collision AABB in world space for a placed build, accounting for rotation
+// Per-piece-type precise collision definitions (local space, centered at piece origin)
+// These are tight-fitted to the actual visual geometry, not oversized boxes.
+// Returns an array of collision boxes for complex shapes (stairs).
+// Also returns walkable surface Y for foundations/floors (player can stand on top).
+export function getCollisionBoxes(pieceType: BuildPieceType, tier: TierType): {
+  boxes: CollisionBox[];
+  walkableY?: number; // Y (world-relative) of walkable top surface
+  isSlope?: boolean;  // stairs have walkable slopes
+} {
+  const s = TIER_SCALE[tier];
+  const t = WALL_THICKNESS * s;
+  switch (pieceType) {
+    case "squareFoundation": {
+      // Only block the sides/perimeter below the top surface
+      // The top surface (worldY + height) is walkable
+      const h = BUILD_PIECE_DEFS.squareFoundation.height * s;
+      return {
+        boxes: [{
+          // Solid block for the slab — only blocks below the top surface
+          minX: -GRID/2*s, maxX: GRID/2*s,
+          minY: -0.6, maxY: h,
+          minZ: -GRID/2*s, maxZ: GRID/2*s,
+        }],
+        walkableY: h,
+      };
+    }
+    case "triangleFoundation": {
+      const h = BUILD_PIECE_DEFS.triangleFoundation.height * s;
+      return {
+        boxes: [{
+          minX: -GRID/2*s, maxX: GRID/2*s,
+          minY: -0.6, maxY: h,
+          minZ: -GRID/2*s, maxZ: GRID/2*s,
+        }],
+        walkableY: h,
+      };
+    }
+    case "wall":
+      return { boxes: [{ minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: WALL_H, minZ: -t/2, maxZ: t/2 }] };
+    case "halfWall":
+      return { boxes: [{ minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: WALL_H*0.5, minZ: -t/2, maxZ: t/2 }] };
+    case "lowWall":
+      return { boxes: [{ minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: WALL_H*0.33, minZ: -t/2, maxZ: t/2 }] };
+    case "doorway":
+      return { boxes: [{ minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: WALL_H, minZ: -t/2, maxZ: t/2 }] };
+    case "windowFrame":
+      return { boxes: [{ minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: WALL_H, minZ: -t/2, maxZ: t/2 }] };
+    case "wallFrame":
+      return { boxes: [{ minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: WALL_H, minZ: -t/2, maxZ: t/2 }] };
+    case "squareFloor":
+      return {
+        boxes: [{
+          minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: 0.2, minZ: -GRID/2*s, maxZ: GRID/2*s,
+        }],
+        walkableY: 0.2,
+      };
+    case "triangleFloor":
+      return {
+        boxes: [{
+          minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: 0.2, minZ: -GRID/2*s, maxZ: GRID/2*s,
+        }],
+        walkableY: 0.2,
+      };
+    case "floorFrame":
+      return {
+        boxes: [{
+          minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: 0.2, minZ: -GRID/2*s, maxZ: GRID/2*s,
+        }],
+        walkableY: 0.2,
+      };
+    case "straightStairs": {
+      // Stairs: thin slabs for each step, not a solid block
+      const stepCount = 6;
+      const stepH = WALL_H / stepCount;
+      const stepD = GRID / stepCount;
+      const boxes: CollisionBox[] = [];
+      for (let i = 0; i < stepCount; i++) {
+        boxes.push({
+          minX: -0.7*s, maxX: 0.7*s,
+          minY: i * stepH, maxY: (i + 1) * stepH,
+          minZ: -GRID/2 + i * stepD, maxZ: -GRID/2 + (i + 1) * stepD,
+        });
+      }
+      return { boxes, walkableY: WALL_H, isSlope: true };
+    }
+    case "uStairs": {
+      // U-stairs: two parallel runs connected by a landing
+      const stepCount = 5;
+      const stepH = WALL_H / (stepCount * 2); // two flights
+      const stepD = (GRID * 0.35) / stepCount;
+      const boxes: CollisionBox[] = [];
+      // Left run
+      for (let i = 0; i < stepCount; i++) {
+        boxes.push({
+          minX: -GRID/2 + 0.1*s, maxX: -GRID/2 + 0.1*s + 1.0*s,
+          minY: i * stepH, maxY: (i + 1) * stepH,
+          minZ: -GRID/2 + i * stepD, maxZ: -GRID/2 + (i + 1) * stepD,
+        });
+      }
+      // Right run (ascending from opposite end)
+      for (let i = 0; i < stepCount; i++) {
+        boxes.push({
+          minX: GRID/2 - 0.1*s - 1.0*s, maxX: GRID/2 - 0.1*s,
+          minY: (stepCount - 1 - i) * stepH, maxY: (stepCount - i) * stepH,
+          minZ: GRID/2 - (i + 1) * stepD, maxZ: GRID/2 - i * stepD,
+        });
+      }
+      return { boxes, walkableY: WALL_H, isSlope: true };
+    }
+    case "lStairs": {
+      // L-stairs: one flight going up, then a landing, then another direction
+      const stepCount = 5;
+      const stepH = WALL_H / (stepCount * 2);
+      const stepD = (GRID * 0.4) / stepCount;
+      const boxes: CollisionBox[] = [];
+      // First flight (ascending along Z)
+      for (let i = 0; i < stepCount; i++) {
+        boxes.push({
+          minX: -GRID/2 + 0.1*s, maxX: -GRID/2 + 0.1*s + 1.0*s,
+          minY: i * stepH, maxY: (i + 1) * stepH,
+          minZ: -GRID/2 + i * stepD, maxZ: -GRID/2 + (i + 1) * stepD,
+        });
+      }
+      // Landing + second flight (ascending along X)
+      const landingY = stepCount * stepH;
+      for (let i = 0; i < stepCount; i++) {
+        boxes.push({
+          minX: -GRID/2 + 0.1*s + GRID * 0.4 + i * stepD,
+          maxX: -GRID/2 + 0.1*s + GRID * 0.4 + (i + 1) * stepD,
+          minY: landingY + i * stepH, maxY: landingY + (i + 1) * stepH,
+          minZ: -GRID/2 + 0.1*s, maxZ: -GRID/2 + 0.1*s + 1.0*s,
+        });
+      }
+      return { boxes, walkableY: WALL_H, isSlope: true };
+    }
+    case "roof":
+      return { boxes: [{ minX: -GRID/2*s, maxX: GRID/2*s, minY: 0, maxY: 1.8, minZ: -GRID/2*s, maxZ: GRID/2*s }] };
+    default:
+      return { boxes: [{ minX: -GRID/2, maxX: GRID/2, minY: 0, maxY: 0.2, minZ: -GRID/2, maxZ: GRID/2 }] };
+  }
+}
+
+// Get walkable surface Y in world space for a placed build (for ground detection)
+export function getWalkableSurfaceY(pb: PlacedBuildV2): number | null {
+  const coll = getCollisionBoxes(pb.pieceType, pb.tier);
+  if (coll.walkableY !== undefined) {
+    return pb.worldY + coll.walkableY;
+  }
+  return null;
+}
+
+// Get collision AABB in world space for a placed build, accounting for rotation.
+// Returns the first (or primary) collision box in world space.
+// Use getAllWorldCollisionBoxes for multi-box pieces like stairs.
 export function getWorldCollisionBox(pb: PlacedBuildV2): {
   minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
+  isSlope?: boolean;
 } {
-  const cbox = getCollisionBox(pb.pieceType, pb.tier);
-  // Apply rotation (0/90/180/270) — swap half-extents for 90/270
+  const coll = getCollisionBoxes(pb.pieceType, pb.tier);
+  if (coll.boxes.length === 0) {
+    const hs = GRID / 2;
+    return { minX: pb.worldX - hs, maxX: pb.worldX + hs, minY: pb.worldY, maxY: pb.worldY + 0.2, minZ: pb.worldZ - hs, maxZ: pb.worldZ + hs };
+  }
+  // Use first box as primary for backward compat
+  const box = coll.boxes[0];
   const rotOdd = (pb.rotation % 2) === 1;
-  const hw = rotOdd ? (cbox.maxZ - cbox.minZ) / 2 : (cbox.maxX - cbox.minX) / 2;
-  const hd = rotOdd ? (cbox.maxX - cbox.minX) / 2 : (cbox.maxZ - cbox.minZ) / 2;
+  const hw = rotOdd ? (box.maxZ - box.minZ) / 2 : (box.maxX - box.minX) / 2;
+  const hd = rotOdd ? (box.maxX - box.minX) / 2 : (box.maxZ - box.minZ) / 2;
   return {
     minX: pb.worldX - hw,
     maxX: pb.worldX + hw,
-    minY: pb.worldY + cbox.minY,
-    maxY: pb.worldY + cbox.maxY,
+    minY: pb.worldY + box.minY,
+    maxY: pb.worldY + box.maxY,
     minZ: pb.worldZ - hd,
     maxZ: pb.worldZ + hd,
+    isSlope: coll.isSlope,
   };
 }
 
-// Check if a piece type should block player movement
+// Get ALL collision boxes in world space for a placed build (for precise collision with stairs etc)
+export function getAllWorldCollisionBoxes(pb: PlacedBuildV2): {
+  minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
+}[] {
+  const coll = getCollisionBoxes(pb.pieceType, pb.tier);
+  return coll.boxes.map(box => {
+    const rotOdd = (pb.rotation % 2) === 1;
+    const hw = rotOdd ? (box.maxZ - box.minZ) / 2 : (box.maxX - box.minX) / 2;
+    const hd = rotOdd ? (box.maxX - box.minX) / 2 : (box.maxZ - box.minZ) / 2;
+    return {
+      minX: pb.worldX - hw,
+      maxX: pb.worldX + hw,
+      minY: pb.worldY + box.minY,
+      maxY: pb.worldY + box.maxY,
+      minZ: pb.worldZ - hd,
+      maxZ: pb.worldZ + hd,
+    };
+  });
+}
+
+// Check if a piece type should block player XZ movement.
+// Foundations now use Y-aware collision in the engine, so they're included here.
+// Floors/roofs don't block (they're walkable surfaces).
 export function shouldBlockPlayer(pieceType: BuildPieceType): boolean {
-  // Floors, stairs, roofs, floor frames, low walls don't block player XZ movement
   const nonBlocking: BuildPieceType[] = [
     "squareFloor", "triangleFloor", "floorFrame",
-    "straightStairs", "uStairs", "lStairs",
     "roof",
     "lowWall",
   ];
@@ -1183,6 +1381,35 @@ export function generateDeployableGeometry(type: DeployableType): THREE.BufferGe
   return mergeGeometries(prepareForMerge(geos))!;
 }
 
+// Find snap position for free-placed deployables near existing same-type deployables
+export function findDeployableSnapPosition(
+  type: DeployableType,
+  position: THREE.Vector3,
+  placedDeployables: PlacedDeployable[],
+): { snapped: boolean; position: THREE.Vector3 } {
+  const snapRange = 2.0; // radius to detect nearby same-type deployables
+  const snapDist = DEPLOYABLE_DEFS[type].w + 0.2; // distance between snapped deployables
+  let best: THREE.Vector3 | null = null;
+  let bestDist = Infinity;
+
+  for (const dep of placedDeployables) {
+    if (dep.type !== type) continue;
+    const depPos = new THREE.Vector3(dep.worldX, dep.worldY, dep.worldZ);
+    const dist = position.distanceTo(depPos);
+    if (dist < snapRange && dist < bestDist) {
+      bestDist = dist;
+      // Snap to the side of the existing deployable closest to the placement point
+      const dir = position.clone().sub(depPos).normalize();
+      // For same-type snap: place next to it at snapDist
+      const snapPos = depPos.clone().add(dir.multiplyScalar(snapDist));
+      snapPos.y = dep.worldY; // same height
+      best = snapPos;
+    }
+  }
+  if (best) return { snapped: true, position: best };
+  return { snapped: false, position };
+}
+
 // Check if a deployable placement would overlap an existing one
 export function checkDeployableOverlap(
   type: DeployableType,
@@ -1193,14 +1420,16 @@ export function checkDeployableOverlap(
   const def = DEPLOYABLE_DEFS[type];
   const hw = def.w / 2;
   const hd = def.d / 2;
+  // Tighter overlap margin — only block if they significantly overlap
+  const margin = 0.1;
 
   for (const dep of placedDeployables) {
     if (dep.id === excludeId) continue;
     const depDef = DEPLOYABLE_DEFS[dep.type];
     const dx = Math.abs(position.x - dep.worldX);
     const dz = Math.abs(position.z - dep.worldZ);
-    const overlapX = dx < hw + depDef.w / 2;
-    const overlapZ = dz < hd + depDef.d / 2;
+    const overlapX = dx < hw + depDef.w / 2 - margin;
+    const overlapZ = dz < hd + depDef.d / 2 - margin;
     if (overlapX && overlapZ) return true;
   }
   return false;

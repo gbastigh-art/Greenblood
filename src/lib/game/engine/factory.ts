@@ -1390,43 +1390,55 @@ export function makeHeldItem(itemId: string): THREE.Group {
     }
     default: {
       // Building Plan: smaller blueprint map held by two white arms
+      // Arms extend from the camera/player view outward to the blueprint
       if (itemId === "buildingPlan") {
-        // Left arm (white sleeve + hand)
-        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.18, 0.04), mat(0xe8ddd0, { roughness: 0.95 }));
-        leftArm.position.set(-0.08, -0.12, -0.5);
-        leftArm.rotation.x = 0.4;
-        leftArm.rotation.z = 0.3;
-        g.add(leftArm);
-        const leftHand = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.03), mat(0xf0e6d6, { roughness: 0.9 }));
-        leftHand.position.set(-0.01, -0.2, -0.55);
-        leftHand.rotation.x = 0.2;
+        // Left arm — extends from bottom-left of view to the blueprint
+        const leftUpperArm = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.20, 0.035), mat(0xe8ddd0, { roughness: 0.95 }));
+        leftUpperArm.position.set(-0.06, -0.18, -0.35);
+        leftUpperArm.rotation.x = 0.6;
+        leftUpperArm.rotation.z = 0.2;
+        g.add(leftUpperArm);
+        // Left forearm extending to blueprint
+        const leftForearm = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.16, 0.03), mat(0xe8ddd0, { roughness: 0.95 }));
+        leftForearm.position.set(-0.03, -0.24, -0.48);
+        leftForearm.rotation.x = 0.3;
+        leftForearm.rotation.z = 0.15;
+        g.add(leftForearm);
+        const leftHand = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.03), mat(0xf0e6d6, { roughness: 0.9 }));
+        leftHand.position.set(-0.005, -0.20, -0.54);
+        leftHand.rotation.x = 0.15;
         g.add(leftHand);
 
-        // Right arm (white sleeve + hand)
-        const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.18, 0.04), mat(0xe8ddd0, { roughness: 0.95 }));
-        rightArm.position.set(0.08, -0.12, -0.5);
-        rightArm.rotation.x = 0.4;
-        rightArm.rotation.z = -0.3;
-        g.add(rightArm);
-        const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.03), mat(0xf0e6d6, { roughness: 0.9 }));
-        rightHand.position.set(0.01, -0.2, -0.55);
-        rightHand.rotation.x = 0.2;
+        // Right arm — extends from bottom-right of view to the blueprint
+        const rightUpperArm = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.20, 0.035), mat(0xe8ddd0, { roughness: 0.95 }));
+        rightUpperArm.position.set(0.06, -0.18, -0.35);
+        rightUpperArm.rotation.x = 0.6;
+        rightUpperArm.rotation.z = -0.2;
+        g.add(rightUpperArm);
+        const rightForearm = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.16, 0.03), mat(0xe8ddd0, { roughness: 0.95 }));
+        rightForearm.position.set(0.03, -0.24, -0.48);
+        rightForearm.rotation.x = 0.3;
+        rightForearm.rotation.z = -0.15;
+        g.add(rightForearm);
+        const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.03), mat(0xf0e6d6, { roughness: 0.9 }));
+        rightHand.position.set(0.005, -0.20, -0.54);
+        rightHand.rotation.x = 0.15;
         g.add(rightHand);
 
         // Blueprint parchment (smaller, centered)
-        const plan = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.01), mat(0xc4a882, { roughness: 0.95 }));
+        const plan = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.26, 0.01), mat(0xc4a882, { roughness: 0.95 }));
         plan.position.set(0, -0.22, -0.56);
         plan.rotation.x = 0.15;
         g.add(plan);
         // Blueprint grid lines
-        const hline = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.003, 0.012), mat(0x444444, { roughness: 1 }));
-        hline.position.set(0, -0.18, -0.555);
+        const hline = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.003, 0.012), mat(0x444444, { roughness: 1 }));
+        hline.position.set(0, -0.19, -0.555);
         g.add(hline);
-        const hline2 = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.003, 0.012), mat(0x444444, { roughness: 1 }));
-        hline2.position.set(0, -0.22, -0.555);
+        const hline2 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.003, 0.012), mat(0x444444, { roughness: 1 }));
+        hline2.position.set(0, -0.23, -0.555);
         g.add(hline2);
-        const vline = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.2, 0.012), mat(0x444444, { roughness: 1 }));
-        vline.position.set(0, -0.2, -0.555);
+        const vline = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.18, 0.012), mat(0x444444, { roughness: 1 }));
+        vline.position.set(0, -0.21, -0.555);
         g.add(vline);
         break;
       }
