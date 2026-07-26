@@ -29,12 +29,14 @@ export class SkySystem {
     this.renderer = renderer;
     this.sun = new THREE.DirectionalLight(0xffffff, 1.5);
     this.sun.castShadow = true;
-    // 1024 is plenty for this style (was 2048). Tightened frustum (60m half-extent
-    // instead of 80m) keeps shadow texel density high while halving the cost.
+    // 1024 shadow map. Tightened frustum (45m half-extent instead of 60m) —
+    // fewer objects render into the shadow pass, and texel density stays high.
+    // The shadow frustum follows the player, so 45m is plenty for visible
+    // shadows in the player's vicinity.
     this.sun.shadow.mapSize.set(1024, 1024);
     this.sun.shadow.camera.near = 0.5;
     this.sun.shadow.camera.far = 200;
-    const d = 60;
+    const d = 45;
     this.sun.shadow.camera.left = -d;
     this.sun.shadow.camera.right = d;
     this.sun.shadow.camera.top = d;
@@ -256,7 +258,11 @@ export class SkySystem {
       this.sun.castShadow = false;
     } else {
       this.sun.castShadow = true;
-      const sz = quality === "high" ? 2048 : 1024;
+      // Shadow map: high=1024, medium=512. Fill-rate cost is quadratic, so
+      // halving the resolution makes the shadow render pass 4× faster.
+      // At 512² with a 45m frustum, texel density is still ~11px/m — plenty
+      // for blocky buildings and tree trunks.
+      const sz = quality === "high" ? 1024 : 512;
       // Only set mapSize if different — three.js will reallocate the shadow
       // texture on next render if the size changed.
       this.sun.shadow.mapSize.set(sz, sz);

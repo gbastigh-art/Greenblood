@@ -111,7 +111,11 @@ export function makeTree(rng: () => number, x: number, z: number, y: number): Tr
         mat(0x2f5a2a, { roughness: 0.9 })
       );
       coneMesh.position.y = trunkH + i * 1.0 - 0.3;
-      coneMesh.castShadow = true;
+      // Canopy cones don't cast shadows — they're small, high up, and their
+      // shadows are blobby/noisy at 512-1024 resolution. The trunk shadow is
+      // the main visual cue for tree grounding. Disabling canopy shadows cuts
+      // ~300 shadow draw calls per shadow-frame (100 trees × 3 cones).
+      coneMesh.castShadow = false;
       g.add(coneMesh);
     }
   } else if (type === "oak") {
@@ -122,7 +126,7 @@ export function makeTree(rng: () => number, x: number, z: number, y: number): Tr
     );
     blob.position.y = trunkH + r * 0.5;
     blob.scale.y = 0.85;
-    blob.castShadow = true;
+    blob.castShadow = false;
     g.add(blob);
     // a second smaller blob
     const blob2 = new THREE.Mesh(
@@ -130,7 +134,7 @@ export function makeTree(rng: () => number, x: number, z: number, y: number): Tr
       mat(0x4a7a3a, { roughness: 0.95, flatShading: true })
     );
     blob2.position.set(r * 0.6, trunkH + r * 0.7, r * 0.2);
-    blob2.castShadow = true;
+    blob2.castShadow = false;
     g.add(blob2);
   } else {
     // birch — sparse small canopy
@@ -140,7 +144,7 @@ export function makeTree(rng: () => number, x: number, z: number, y: number): Tr
       mat(0xbfd17a, { roughness: 0.95, flatShading: true })
     );
     blob.position.y = trunkH + r * 0.4;
-    blob.castShadow = true;
+    blob.castShadow = false;
     g.add(blob);
   }
   return { group: g, type, hp: 100, maxHp: 100, chopped: false };

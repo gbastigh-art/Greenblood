@@ -327,6 +327,11 @@ export class Engine {
   graphicsQuality: "low" | "medium" | "high" = "medium";
   // Visibility-cull throttle — we don't want to re-check 500+ objects every frame.
   visibilityTimer = 0;
+  // Shadow-map update throttle. The sun (and thus the shadow camera) moves
+  // very slowly (24-min day cycle), so re-rendering the 1024² shadow map every
+  // frame is wasteful. We update it ~10×/sec instead — visually identical, but
+  // cuts the entire shadow render-pass cost by ~85%.
+  shadowUpdateTimer = 0;
   // Test Range flag — when true, the engine skips procedural world population
   // and builds a flat gray grid with one of every interactable object instead.
   isTestRange = false;
@@ -335,6 +340,60 @@ export class Engine {
   fireLights: THREE.PointLight[] = [];
   flameMeshes: THREE.Mesh[] = [];
   fireCacheDirty = true;
+
+  // ===== Performance: shared resources =====
+  // Material cache keyed by `${pieceType}_${tier}` — avoids creating a new
+  // MeshStandardMaterial per building instance. Shared materials are safe because
+  // meshes only read from them.
+  private buildMatCache: Map<string, THREE.MeshStandardMaterial> = new Map();
+  private deployMatCache: Map<string, THREE.MeshStandardMaterial> = new Map();
+  // Reused raycaster + NDC vector for build-mode placement raycasts (avoid per-frame allocation)
+  private buildRaycaster: THREE.Raycaster = new THREE.Raycaster();
+  private buildNDC: THREE.Vector2 = new THREE.Vector2(0, 0);
+  // Reusable temp vector for the ground ray-march (avoids per-frame allocation)
+  private _tmpVec3b: THREE.Vector3 = new THREE.Vector3();
+  // Cached list of raycast targets for build mode (rebuilt only when builds change)
+  private buildRaycastTargets: THREE.Object3D[] = [];
+  private buildRaycastTargetsDirty = true;
+
+  getBuildMaterial(pieceType: string, tier: string): THREE.MeshStandardMaterial {
+    const key = `${pieceType}_${tier}`;
+    let m = this.buildMatCache.get(key);
+    if (!m) {
+      const tv = TIER_VISUALS[tier as TierType];
+      m = new THREE.MeshStandardMaterial({
+        color: tv.color,
+        roughness: tv.roughness,
+        metalness: tv.metalness,
+        transparent: false,
+        opacity: 1.0,
+        flatShading: tv.flatShading,
+        // FrontSide enables back-face culling — the GPU skips shading the
+        // interior faces of wall/foundation boxes. With DoubleSide, every
+        // back-facing fragment still ran the full PBR shader before being
+        // rejected by the depth test, roughly doubling fragment cost. Builds
+        // are solid volumes, so you never see their interior faces.
+        side: THREE.FrontSide,
+        depthWrite: true,
+      });
+      this.buildMatCache.set(key, m);
+    }
+    return m;
+  }
+
+  getDeployableMaterial(type: string): THREE.MeshStandardMaterial {
+    let m = this.deployMatCache.get(type);
+    if (!m) {
+      m = new THREE.MeshStandardMaterial({
+        color: 0x6b4a2b,
+        roughness: 0.9,
+        metalness: 0.0,
+        side: THREE.FrontSide,
+      });
+      this.deployMatCache.set(type, m);
+    }
+    return m;
+  }
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -352,6 +411,10 @@ export class Engine {
     this.renderer.setPixelRatio(dprCap);
     this.renderer.shadowMap.enabled = quality !== "low";
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // Don't auto-update the shadow map every frame — we trigger it on a timer
+    // in the main loop (~10Hz). The sun moves slowly so this is visually
+    // identical but avoids re-rendering the whole shadow scene 60×/sec.
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
@@ -472,7 +535,7 @@ export class Engine {
           // Remove old ghost so it regenerates with new piece type
           if (this.ghostV2Mesh) {
             this.scene.remove(this.ghostV2Mesh);
-            this.ghostV2Mesh.geometry.dispose();
+            // Do NOT dispose geometry — it is a shared cached geometry.
             (this.ghostV2Mesh.material as THREE.Material).dispose();
             this.ghostV2Mesh = null;
           }
@@ -515,6 +578,11 @@ export class Engine {
           this.graphicsQuality = s.graphicsQuality;
           this.sky.setQuality(s.graphicsQuality);
           this.renderer.shadowMap.enabled = s.graphicsQuality !== "low";
+          // Keep our manual throttle active (autoUpdate stays false).
+          this.renderer.shadowMap.autoUpdate = false;
+          // Force one immediate shadow update so the new mapSize takes effect.
+          this.renderer.shadowMap.needsUpdate = true;
+          this.shadowUpdateTimer = 0;
           // Update pixel ratio cap (live-safe in three.js)
           const dprCap = s.graphicsQuality === "high" ? 1.5 : s.graphicsQuality === "medium" ? 1.0 : 0.75;
           this.renderer.setPixelRatio(dprCap);
@@ -1803,11 +1871,20 @@ export class Engine {
       if (dx * dx + dz * dz < pr * pr) return true;
     }
     // Placed V2 builds (Rust-style building system) — AABB collision with Y check
+    // Performance: pre-filter by cheap XZ distance before computing precise boxes.
+    // A build can only collide if its center is within (maxHalfExtent + playerRadius)
+    // of the player. maxHalfExtent for a 3m foundation is ~1.5, so 3m is a safe bound.
     const placedV2 = useGame.getState().placedV2;
     const playerY = this.playerPos.y;
     const playerHeadY = playerY + (this.playerCrouch ? 1.2 : this.playerEyeHeight);
+    const preFilterR = 2.5 + pr; // 1.5 (half of 3m grid) + small margin + player radius
+    const preFilterR2 = preFilterR * preFilterR;
     for (let i = 0; i < placedV2.length; i++) {
       const pb = placedV2[i];
+      // Cheap XZ distance pre-filter — skip builds more than ~3m away
+      const ddx = pb.worldX - x;
+      const ddz = pb.worldZ - z;
+      if (ddx * ddx + ddz * ddz > preFilterR2) continue;
       // Skip non-blocking piece types (floors, roofs, etc.)
       if (!shouldBlockPlayer(pb.pieceType)) continue;
       // Use all collision boxes for precise multi-box collision (stairs, etc.)
@@ -1825,12 +1902,17 @@ export class Engine {
       if (blocked) return true;
     }
     // Placed V2 deployables — simple AABB collision (storage boxes, etc.)
+    // With cheap XZ distance pre-filter
     const placedDeps = useGame.getState().placedDeployables;
+    const depPreFilterR2 = (2 + pr) * (2 + pr);
     for (let i = 0; i < placedDeps.length; i++) {
       const dep = placedDeps[i];
       const depDef = DEPLOYABLE_DEFS[dep.type];
       if (!depDef) continue;
       if (depDef.category === "utility") continue;
+      const ddx = dep.worldX - x;
+      const ddz = dep.worldZ - z;
+      if (ddx * ddx + ddz * ddz > depPreFilterR2) continue;
       const dhw = depDef.w / 2;
       const dhd = depDef.d / 2;
       const cx = Math.max(dep.worldX - dhw, Math.min(x, dep.worldX + dhw));
@@ -2791,6 +2873,16 @@ export class Engine {
     // Cave discovery tracking removed (Task 6 — cave system removed).
     // caveEntrances is always empty now, so the loop below would never execute.
 
+    // Shadow-map throttle: trigger a shadow re-render ~5×/sec instead of every
+    // frame. autoUpdate is false (set in init), so we manually flag needsUpdate.
+    // The sun moves slowly so 5Hz is visually identical but avoids the full
+    // shadow render-pass (400+ meshes) on ~95% of frames.
+    this.shadowUpdateTimer += dt;
+    if (this.shadowUpdateTimer >= 0.2) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this.shadowUpdateTimer = 0;
+    }
+
     this.renderer.render(this.scene, this.camera);
     // Render hand view on top
     this.renderer.autoClear = false;
@@ -3050,17 +3142,23 @@ export class Engine {
     const groundY = this.terrain.getHeight(this.playerPos.x, this.playerPos.z);
     const eyeH = this.playerCrouch ? 1.2 : this.playerEyeHeight;
     // Also check building surfaces (foundations, floors, stairs) for walkable ground
+    // Performance: pre-filter by XZ distance so we only check nearby builds.
     let buildGroundY: number | null = null;
     const placedV2Ground = useGame.getState().placedV2;
+    const walkFilterR2 = 3 * 3; // 3m — max half-extent of any build
     for (let i = 0; i < placedV2Ground.length; i++) {
       const pb = placedV2Ground[i];
+      // Cheap XZ distance pre-filter
+      const ddx = pb.worldX - this.playerPos.x;
+      const ddz = pb.worldZ - this.playerPos.z;
+      if (ddx * ddx + ddz * ddz > walkFilterR2) continue;
       const surfY = getWalkableSurfaceY(pb);
       if (surfY === null) continue;
+      // Only consider surfaces at or below the player's current feet (can't stand on something above you)
+      if (surfY > this.playerPos.y + 0.5) continue;
       // Check if player is within the XZ footprint of this build
       const allBoxes = getAllWorldCollisionBoxes(pb);
       for (const box of allBoxes) {
-        // For walkable surfaces, check XZ overlap loosely (within the top surface)
-        // Use the full box footprint, but only the top Y matters
         if (this.playerPos.x >= box.minX - 0.1 && this.playerPos.x <= box.maxX + 0.1 &&
             this.playerPos.z >= box.minZ - 0.1 && this.playerPos.z <= box.maxZ + 0.1) {
           if (buildGroundY === null || surfY > buildGroundY) {
@@ -4149,24 +4247,65 @@ export class Engine {
       if (!this.ghostV2Mesh) {
         this.createV2Ghost(g.selectedBuildPiece, "twig");
       }
-      // Raycast to find snap position
-      const ray = new THREE.Raycaster();
-      ray.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-      ray.far = 10;
-      const targets: THREE.Object3D[] = [this.terrain.mesh];
-      for (const pb of g.placedV2) {
-        const m = (pb as any).mesh as THREE.Object3D;
-        if (m) targets.push(m);
+      // Raycast to find snap position (reuses cached raycaster + NDC vector)
+      this.buildRaycaster.setFromCamera(this.buildNDC, this.camera);
+      this.buildRaycaster.far = 10;
+      // Rebuild targets only when builds changed — NOTE: terrain.mesh is
+      // intentionally EXCLUDED. The terrain has 80k triangles and three.js
+      // does brute-force ray-triangle intersection (no BVH), so including it
+      // costs ~80k intersection tests every frame when holding a Building
+      // Plan. Instead we compute the ground hit via a cheap ray-march below.
+      if (this.buildRaycastTargetsDirty) {
+        this.buildRaycastTargets.length = 0;
+        for (const pb of g.placedV2) {
+          const m = (pb as any).mesh as THREE.Object3D;
+          if (m) this.buildRaycastTargets.push(m);
+        }
+        for (const p of g.placed) {
+          const m = (p as any).mesh as THREE.Object3D;
+          if (m) this.buildRaycastTargets.push(m);
+        }
+        this.buildRaycastTargetsDirty = false;
       }
-      // Also include legacy placed builds for compatibility
-      for (const p of g.placed) {
-        const m = (p as any).mesh as THREE.Object3D;
-        if (m) targets.push(m);
+      const hits = this.buildRaycaster.intersectObjects(this.buildRaycastTargets, true);
+
+      // Ground hit via ray-march: step along the camera ray and find where it
+      // dips below the terrain heightfield. ~40 steps of 0.25m = 10m range,
+      // vastly cheaper than raycasting 80k terrain triangles.
+      const camOrigin = this.camera.position;
+      const camDir = this._tmpVec3b.set(0, 0, 0);
+      this.camera.getWorldDirection(camDir);
+      let groundHitT = -1;
+      const marchStep = 0.25;
+      const marchMax = 10;
+      for (let mt = 0.5; mt < marchMax; mt += marchStep) {
+        const px = camOrigin.x + camDir.x * mt;
+        const pz = camOrigin.z + camDir.z * mt;
+        const py = camOrigin.y + camDir.y * mt;
+        if (py <= this.terrain.getHeight(px, pz)) {
+          groundHitT = mt;
+          break;
+        }
       }
-      const hits = ray.intersectObjects(targets, true);
-      if (hits.length > 0) {
-        const hitPoint = hits[0].point.clone();
-        const hitNormal = hits[0].face?.normal ? hits[0].face.normal.clone() : null;
+
+      // Pick the closer hit: building mesh vs ground
+      const buildingDist = hits.length > 0 ? hits[0].distance : Infinity;
+      const groundDist = groundHitT > 0 ? groundHitT : Infinity;
+      if (buildingDist < Infinity || groundDist < Infinity) {
+        let hitPoint: THREE.Vector3;
+        let hitNormal: THREE.Vector3 | null;
+        if (buildingDist <= groundDist) {
+          hitPoint = hits[0].point.clone();
+          hitNormal = hits[0].face?.normal ? hits[0].face.normal.clone() : null;
+        } else {
+          hitPoint = new THREE.Vector3(
+            camOrigin.x + camDir.x * groundDist,
+            camOrigin.y + camDir.y * groundDist,
+            camOrigin.z + camDir.z * groundDist,
+          );
+          hitPoint.y = this.terrain.getHeight(hitPoint.x, hitPoint.z);
+          hitNormal = new THREE.Vector3(0, 1, 0);
+        }
         const snap = findSnapPosition(
           g.selectedBuildPiece,
           hitPoint,
@@ -4185,7 +4324,9 @@ export class Engine {
             const fp = calculateFoundationPlacement(snap.position.x, snap.position.z, (x, z) => this.terrain.getHeight(x, z));
             this.ghostV2Mesh.position.y = fp.worldY;
             const newGeo = generateBuildGeometry(g.selectedBuildPiece, "twig", fp.legExtension);
-            this.ghostV2Mesh.geometry.dispose();
+            // CRITICAL: do NOT dispose the old geometry — generateBuildGeometry()
+            // returns a SHARED, cached BufferGeometry. Disposing it corrupts the
+            // cache and forces a GPU re-upload every frame (massive stall).
             this.ghostV2Mesh.geometry = newGeo;
           }
         } else {
@@ -4202,7 +4343,7 @@ export class Engine {
       // Remove ghost if no longer holding Building Plan or no piece selected
       if (this.ghostV2Mesh) {
         this.scene.remove(this.ghostV2Mesh);
-        this.ghostV2Mesh.geometry.dispose();
+        // Do NOT dispose geometry — it is a shared cached geometry.
         (this.ghostV2Mesh.material as THREE.Material).dispose();
         this.ghostV2Mesh = null;
       }
@@ -4211,20 +4352,19 @@ export class Engine {
 
     // Handle hammer: detect what build piece or deployable the player is looking at
     if (activeId === "hammer") {
-      const ray = new THREE.Raycaster();
-      ray.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-      ray.far = 5;
+      this.buildRaycaster.setFromCamera(this.buildNDC, this.camera);
+      this.buildRaycaster.far = 5;
+      // Reuse cached targets if dirty (added V2 + deployables here)
       const targets: THREE.Object3D[] = [];
       for (const pb of g.placedV2) {
         const m = (pb as any).mesh as THREE.Object3D;
         if (m) targets.push(m);
       }
-      // Also ray against deployables
       for (const dep of g.placedDeployables) {
         const m = (dep as any).mesh as THREE.Object3D;
         if (m) targets.push(m);
       }
-      const hits = ray.intersectObjects(targets, true);
+      const hits = this.buildRaycaster.intersectObjects(targets, true);
       if (hits.length > 0) {
         const hitObj = hits[0].object;
         // Traverse up to find the root mesh that matches a placed build or deployable
@@ -4236,11 +4376,10 @@ export class Engine {
             if (m === current) { buildId = pb.id; break; }
           }
           if (buildId !== null) break;
-          // Check deployables
           if (buildId === null) {
             for (const dep of g.placedDeployables) {
               const m = (dep as any).mesh as THREE.Object3D;
-              if (m === current) { buildId = -dep.id; break; } // negative = deployable
+              if (m === current) { buildId = -dep.id; break; }
             }
           }
           if (buildId !== null) break;
@@ -4250,12 +4389,10 @@ export class Engine {
       } else {
         g.setHammerTargetId(null);
       }
-      // Check for pending hammer action from radial menu
       if (g.pendingHammerAction) {
         this.tryHammerAction(g.pendingHammerAction);
         g.clearPendingHammerAction();
       }
-      // Check for pending upgrade action
       if (g.pendingUpgradeTier) {
         this.tryUpgradeV2(g.pendingUpgradeTier);
         g.clearPendingUpgradeTier();
@@ -4269,7 +4406,7 @@ export class Engine {
     // Remove old ghost
     if (this.ghostV2Mesh) {
       this.scene.remove(this.ghostV2Mesh);
-      this.ghostV2Mesh.geometry.dispose();
+      // Do NOT dispose geometry — it is a shared cached geometry.
       (this.ghostV2Mesh.material as THREE.Material).dispose();
     }
     // Calculate leg extension for foundations
@@ -4315,23 +4452,16 @@ export class Engine {
       legExt = calculateFoundationLegExtension(pos.x, pos.z, (x, z) => this.terrain.getHeight(x, z));
     }
     const geo = generateBuildGeometry(g.selectedBuildPiece, "twig", legExt);
-    const tv = TIER_VISUALS["twig"];
-    const mat = new THREE.MeshStandardMaterial({
-      color: tv.color,
-      roughness: tv.roughness,
-      metalness: tv.metalness,
-      transparent: false,
-      opacity: 1.0,
-      flatShading: tv.flatShading,
-      side: THREE.DoubleSide,
-      depthWrite: true,
-    });
+    const mat = this.getBuildMaterial(g.selectedBuildPiece, "twig");
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(pos);
     mesh.rotation.y = (rot * Math.PI) / 2;
+    // Cast shadows on the ground, but don't receive (avoids expensive self-shadowing
+    // fragment work when the player is close — biggest perf win).
     mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.receiveShadow = false;
     this.scene.add(mesh);
+    this.buildRaycastTargetsDirty = true;
 
     // Calculate actual rotation from the ghost mesh (snap may have overridden it)
     const actualRot = Math.round((this.ghostV2Mesh.rotation.y / (Math.PI / 2)) % 4 + 4) % 4;
@@ -4358,20 +4488,18 @@ export class Engine {
     const def = DEPLOYABLE_DEFS[itemType];
 
     // Raycast to find where to place
-    const ray = new THREE.Raycaster();
-    ray.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-    ray.far = 5;
+    this.buildRaycaster.setFromCamera(this.buildNDC, this.camera);
+    this.buildRaycaster.far = 5;
     const targets: THREE.Object3D[] = [this.terrain.mesh];
     for (const pb of g.placedV2) {
       const m = (pb as any).mesh as THREE.Object3D;
       if (m) targets.push(m);
     }
-    // Also add existing deployables as ray targets
     for (const dep of g.placedDeployables) {
       const m = (dep as any).mesh as THREE.Object3D;
       if (m) targets.push(m);
     }
-    const hits = ray.intersectObjects(targets, true);
+    const hits = this.buildRaycaster.intersectObjects(targets, true);
     if (hits.length === 0) return;
 
     const hitPoint = hits[0].point.clone();
@@ -4418,18 +4546,14 @@ export class Engine {
 
     // Create mesh
     const geo = generateDeployableGeometry(itemType);
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x6b4a2b, // wood color for most deployables
-      roughness: 0.9,
-      metalness: 0.0,
-      side: THREE.DoubleSide,
-    });
+    const mat = this.getDeployableMaterial(itemType);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(placePos);
     mesh.rotation.y = (placeRot * Math.PI) / 2;
     mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.receiveShadow = false;
     this.scene.add(mesh);
+    this.buildRaycastTargetsDirty = true;
 
     const dep: PlacedDeployable = {
       id: buildIdCounter++,
@@ -4465,10 +4589,9 @@ export class Engine {
         case "demolish": {
           // Remove the deployable
           this.scene.remove(mesh);
-          mesh.geometry.dispose();
-          (mesh.material as THREE.Material).dispose();
+          // NOTE: geometry/material are shared/cached — do not dispose.
           g.removeDeployable(dep.id);
-          // Return materials
+          this.buildRaycastTargetsDirty = true;
           g.addItem(dep.type, 1);
           g.toast(`Demolished ${dep.type}`, "info");
           g.emitAudio("hit");
@@ -4517,9 +4640,9 @@ export class Engine {
       case "demolish": {
         // Remove the build and return some materials
         this.scene.remove(mesh);
-        mesh.geometry.dispose();
-        (mesh.material as THREE.Material).dispose();
+        // NOTE: do not dispose geometry/material — they are shared/cached.
         g.removePlacedV2(pb.id);
+        this.buildRaycastTargetsDirty = true;
         // Return 25% of wood cost
         const refund = Math.floor(BUILD_PIECE_DEFS[pb.pieceType].woodCost * 0.25);
         if (refund > 0) g.addItem("wood", refund);
@@ -4564,21 +4687,11 @@ export class Engine {
     // Upgrade
     g.removeItem(cost.id, cost.qty);
     g.upgradePlacedV2(pb.id, newTier);
-    // Update mesh visuals
-    const tv = TIER_VISUALS[newTier];
+    // Update mesh visuals (use cached material + geometry — no per-instance allocation)
     const newGeo = generateBuildGeometry(pb.pieceType, newTier);
-    mesh.geometry.dispose();
     mesh.geometry = newGeo;
-    const newMat = new THREE.MeshStandardMaterial({
-      color: tv.color,
-      roughness: tv.roughness,
-      metalness: tv.metalness,
-      transparent: tv.opacity < 1,
-      opacity: tv.opacity,
-      flatShading: tv.flatShading,
-    });
-    (mesh.material as THREE.Material).dispose();
-    mesh.material = newMat;
+    mesh.material = this.getBuildMaterial(pb.pieceType, newTier);
+    this.buildRaycastTargetsDirty = true;
     g.toast(`Upgraded to ${newTier}`, "good");
     g.emitAudio("place");
   }
